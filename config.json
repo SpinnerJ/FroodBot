@@ -1,0 +1,8 @@
+{
+    "token_path": "token.txt",
+    "data_path": "path.txt",
+    "message_limit": 100,
+    "scrape_timeout_minutes": 5,
+    "response_max_length": 1024,
+    "max_new_tokens": 50
+}
