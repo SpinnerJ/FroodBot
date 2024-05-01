@@ -5,7 +5,7 @@ import json
 import asyncio
 from data_handler import DataHandler
 import random
-from mimic import MimicHandler
+from mimic_handler import MimicHandler
 
 # Load configuration
 with open('config.json', 'r') as f:

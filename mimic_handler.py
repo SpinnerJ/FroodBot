@@ -1,6 +1,6 @@
 from data_handler import DataHandler
 import random
-from aiHandler import AIHandler
+from ai_handler import AIHandler
 import threading
 
 
