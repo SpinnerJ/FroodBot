@@ -22,7 +22,7 @@ client = commands.Bot(command_prefix='!', intents=intents)
 data_handler = DataHandler(data_path)
 
 # Initialize MimicHandler with DataHandler instance
-mimic_handler = MimicHandler(data_handler)
+mimic_handler = MimicHandler(data_handler, base_path=data_path)
 
 mimic_data = {}
 
