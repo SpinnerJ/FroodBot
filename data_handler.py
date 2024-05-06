@@ -42,7 +42,7 @@ class DataHandler:
             if not channel.is_nsfw():
                 try:
                     async for message in channel.history(limit=None, oldest_first=False):
-                        if message.content.startswith('!') or not message.content.strip():
+                        if message.content.startswith('!') or "&" in message.content or not message.content.strip():
                             continue
                         if message.author == ctx.author:
                             if previous_message:
