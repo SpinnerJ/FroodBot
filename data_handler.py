@@ -10,6 +10,8 @@ class DataHandler:
     def __init__(self, base_path):
         self.base_path = base_path
         os.makedirs(os.path.dirname(self.base_path), exist_ok=True)
+        self.scraping_in_progress = False
+        self.scraping_queue = []
 
     def save_messages_to_csv(self, key, message_pairs):
         if not message_pairs:
@@ -23,6 +25,12 @@ class DataHandler:
         return filename
 
     async def perform_scraping(self, ctx, key, client):
+        if self.scraping_in_progress:
+            self.scraping_queue.append((ctx, key))
+            await ctx.send('Scraping is currently in progress. Your request has been added to the queue.')
+            return
+
+        self.scraping_in_progress = True
         await ctx.send('Scraping your messages. Please wait...')
         end_time = dt.now() + timedelta(minutes=5)
         limit = 1000
@@ -54,6 +62,10 @@ class DataHandler:
             await ctx.send(f"Messages saved!")
         else:
             await ctx.send("No messages found or an error occurred during scraping.")
+        self.scraping_in_progress = False
+        if self.scraping_queue:
+            next_ctx, next_key, next_client = self.scraping_queue.pop(0)
+            await self.perform_scraping(next_ctx, next_key, next_client)
         return messages
 
     def load_messages_from_csv(self, key):

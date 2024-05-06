@@ -2,6 +2,8 @@ from data_handler import DataHandler
 import random
 from ai_handler import AIHandler
 import threading
+import os
+import csv
 
 
 class MimicHandler:
@@ -56,3 +58,26 @@ class MimicHandler:
             await ctx.send(f"Training AI model for user: {username}")
         else:
             await ctx.send("No user to mimic. Use the !mimic_random or !mimic_ai command first.")
+
+    async def guess_who(self, ctx):
+        self.use_ai = False
+        directory = "./data"
+        files = [f for f in os.listdir(directory) if f.endswith('.csv')]  # get list of .csv files
+        random_file = random.choice(files)  # choose a random .csv file
+        file_path = os.path.join(directory, random_file)  # get the full file path
+
+        # Read the .csv file and filter the lines labeled with "User message"
+        with open(file_path, 'r', encoding='utf-8') as f:  # specify the encoding here
+            reader = csv.reader(f)
+            user_messages = [row[1] for row in reader if row[0] == "User message"]
+
+        # Choose a random line from the filtered lines
+        random_line = random.choice(user_messages) if user_messages else None
+
+        # Extract the user name from the file name
+        user_name = os.path.splitext(random_file)[0]  # remove the extension to get the username
+
+        await ctx.send(f"Guess who said: {random_line}")
+        await ctx.send(f"||{user_name}!||")
+
+
