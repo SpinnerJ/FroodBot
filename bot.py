@@ -27,6 +27,40 @@ mimic_handler = MimicHandler(data_handler, base_path=data_path)
 mimic_data = {}
 
 
+class Bot:
+    def __init__(self):
+        self.action_queue = []
+        self.is_busy = False
+
+    async def handle_command(self, command, ctx):
+        self.action_queue.append((command, ctx))
+        if not self.is_busy:
+            await self.process_queue()
+
+    async def process_queue(self):
+        self.is_busy = True
+        while self.action_queue:
+            command, ctx = self.action_queue.pop(0)
+            await self.execute_command(command, ctx)
+        self.is_busy = False
+
+    async def execute_command(self, command, ctx):
+        if command[0] == 'scrape':
+            confirm = command[1]
+            key = f'{ctx.author.name}_{ctx.guild.name}'
+            existing_filename = data_handler.check_for_existing_csv(key)
+            if existing_filename and confirm != "yes":
+                await ctx.send(
+                    "You already have saved messages. Would you like to overwrite them? Respond with `!scrape yes` to overwrite.")
+            elif existing_filename and confirm == "yes":
+                await data_handler.perform_scraping(ctx, key, client)
+            else:
+                await ctx.send('Invalid command')
+
+
+bot = Bot()
+
+
 @client.event
 async def on_ready():
     print(f'Logged in as {client.user}!')
@@ -34,15 +68,7 @@ async def on_ready():
 
 @client.command()
 async def scrape(ctx, confirm: str = None):
-    key = f'{ctx.author.name}_{ctx.guild.name}'
-    existing_filename = data_handler.check_for_existing_csv(key)
-    if existing_filename and confirm != "yes":
-        await ctx.send(
-            "You already have saved messages. Would you like to overwrite them? Respond with `!scrape yes` to overwrite.")
-    elif existing_filename and confirm == "yes":
-        await data_handler.perform_scraping(ctx, key, client)
-    else:
-        await data_handler.perform_scraping(ctx, key, client)
+    await bot.handle_command(('scrape', confirm), ctx)
 
 
 @client.command()
@@ -78,7 +104,7 @@ async def info(ctx):
     - !clear: Clear the current mimicked user.
     - !mimic_ai: Train an AI model to mimic your saved content.
     - !guess_who: Guess who said a randomly chosen message.
-    - !mimic_random: Select yourself as the mimicked user. When invoked with !r, the bot will output a 
+    - !mimic_random: Select yourself as the mimicked user. When invoked with !r, the bot will output a
         random message from your saved content.
     """
     await ctx.send(help_message)

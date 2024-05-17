@@ -128,17 +128,30 @@ class DataHandler:
         safe_key = self._sanitize_key(key)
         input_file = os.path.join(self.base_path, f'{safe_key}.csv')
         output_file = os.path.join(self.base_path, f'{safe_key}_preprocessed.txt')
+        links_file = os.path.join(self.base_path, f'{safe_key}_links.txt')
 
-        with open(input_file, 'r', encoding='utf-8') as infile, open(output_file, 'w', encoding='utf-8') as outfile:
+        url_pattern = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
+
+        with open(input_file, 'r', encoding='utf-8') as infile, open(output_file, 'w',
+                                                                     encoding='utf-8') as outfile, open(links_file, 'w',
+                                                                                                        encoding='utf-8') as linkfile:
             reader = csv.reader(infile)
             next(reader)  # Skip header
             conversation = []
+            link_counter = 0
             for row in reader:
                 if row[0].lower().startswith('query'):
                     if conversation:
                         outfile.write("\n".join(conversation) + "\n\n")
                     conversation = []
                 if row[1].strip():
-                    conversation.append(row[1].strip())
+                    message = row[1].strip()
+                    urls_in_message = url_pattern.findall(message)
+                    for url in urls_in_message:
+                        link_placeholder = f"link{link_counter}"
+                        message = message.replace(url, link_placeholder)
+                        linkfile.write(f"{link_placeholder},{url}\n")
+                        link_counter += 1
+                    conversation.append(message)
             if conversation:
                 outfile.write("\n".join(conversation) + "\n")
