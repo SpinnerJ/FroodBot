@@ -20,17 +20,27 @@ class DataHandler:
         filename = os.path.join(self.base_path, f'{safe_key}.csv')
         with open(filename, 'w', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
-            writer.writerow(['Query', 'Response'])
             writer.writerows(message_pairs)
         return filename
 
-    async def perform_scraping(self, ctx, key, client):
-        if self.scraping_in_progress:
-            self.scraping_queue.append((ctx, key))
-            await ctx.send('Scraping is currently in progress. Your request has been added to the queue.')
-            return
+    def is_key_in_queue(self, user_key):
+        for item in self.scraping_queue:
+            ctx, key = item
+            if key == user_key:
+                return True
+        return False
 
+
+    async def perform_scraping(self, ctx, key, client):
+        if self.scraping_in_progress and self.currently_scraping == key:
+            await ctx.send('Your data is currently being scraped. Please wait...')
+            return
+        elif self.is_key_in_queue(key):
+            await ctx.send('You are already in the scraping queue. Please wait...')
+            return
         self.scraping_in_progress = True
+        self.currently_scraping = key
+        user = ctx.author
         await ctx.send('Scraping your messages. Please wait...')
         end_time = dt.now() + timedelta(minutes=5)
         limit = 1000
@@ -42,14 +52,14 @@ class DataHandler:
             if not channel.is_nsfw():
                 try:
                     async for message in channel.history(limit=None, oldest_first=False):
-                        if message.content.startswith('!') or "&" in message.content or not message.content.strip():
+                        if message.content.startswith('!') or "@" in message.content or not message.content.strip():
                             continue
-                        if message.author == ctx.author:
-                            if previous_message:
-                                messages.append(["User message", previous_message.content, "Response", message.content])
-                            previous_message = message
-                        elif previous_message and previous_message.author != ctx.author:
-                            messages.append(["User message", previous_message.content, "Response", message.content])
+                        if message.author == ctx.author: #if the message is from the user
+                            messages.append(["User: ", message.content])
+                            if previous_message: #if there is a previous message
+                                previous_message = message
+                        elif previous_message and message.author != ctx.author:
+                            messages.append(["Query: ", previous_message.content])
                             previous_message = None
 
                         if len(messages) >= limit or dt.now() > end_time:
@@ -58,11 +68,16 @@ class DataHandler:
                     await ctx.send(f"Bot does not have 'Read Message History' permission in channel: {channel.name}")
                     continue
         if messages:
+            messages.reverse()
             filename = self.save_messages_to_csv(key, messages)
-            await ctx.send(f"Messages saved!")
+            await ctx.send(f"Messages saved for user: {ctx.author}")
         else:
             await ctx.send("No messages found or an error occurred during scraping.")
+
         self.scraping_in_progress = False
+        self.currently_scraping = None
+
+        user = None
         if self.scraping_queue:
             next_ctx, next_key, next_client = self.scraping_queue.pop(0)
             await self.perform_scraping(next_ctx, next_key, next_client)
@@ -71,12 +86,18 @@ class DataHandler:
     def load_messages_from_csv(self, key):
         safe_key = self._sanitize_key(key)
         filename = os.path.join(self.base_path, f'{safe_key}.csv')
-        if not os.path.exists(filename):
-            return []
-        with open(filename, 'r', encoding='utf-8') as file:
-            reader = csv.reader(file)
-            next(reader)  # Skip the header
-            return [row for row in reader]
+        messages = []
+        try:
+            with open(filename, 'r', encoding='utf-8') as file:
+                reader = csv.reader(file)
+                messages = [row[1].lstrip(',').strip() for row in reader if row[0].strip() == "User:"]
+        except FileNotFoundError:
+            print(f"File does not exist: {filename}")
+        except csv.Error as e:
+            print(f"Error reading CSV file at line {reader.line_num}: {e}")
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+        return messages
 
     def check_for_existing_csv(self, key):
         safe_key = self._sanitize_key(key)

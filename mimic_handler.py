@@ -16,9 +16,9 @@ class MimicHandler:
     async def mimic_random(self, ctx):
         self.use_ai = False  # Set the flag to False when mimicking randomly
         key = f'{ctx.author.name}_{ctx.guild.name}'
-        messages = self.data_handler.load_messages_from_csv(key)
-        user_messages = [msg[1] for msg in messages if msg[0] == "User message"]
-        self.mimic_data[ctx.channel.id] = (ctx.author.name, user_messages)
+        if key not in self.mimic_data:
+            user_messages = self.data_handler.load_messages_from_csv(key)
+            self.mimic_data[key] = user_messages
         await ctx.send(f"Now mimicking: {ctx.author.name}")
 
     async def clear(self, ctx):
@@ -29,8 +29,9 @@ class MimicHandler:
             await ctx.send("No user to clear. Use the !mimic_random or !mimic_ai command first.")
 
     async def r(self, ctx, *args):
-        if ctx.channel.id in self.mimic_data:
-            username, messages = self.mimic_data[ctx.channel.id]
+        key = f'{ctx.author.name}_{ctx.guild.name}'
+        if key in self.mimic_data:
+            user_messages = self.mimic_data[key]
             if self.use_ai:  # Use the flag to decide which method to use
                 # Generate a response using AIHandler
                 input_text = ' '.join(args)
@@ -38,26 +39,26 @@ class MimicHandler:
                 await ctx.send(f"{ctx.author.name} AI says: {generated_text}")
             else:
                 # Generate a response by randomly selecting a message
-                if messages:
-                    await ctx.send(f"{username} says: {random.choice(messages)}")
+                if user_messages:
+                    await ctx.send(f"{ctx.author.name} says: {random.choice(user_messages)}")
                 else:
-                    await ctx.send(f"No messages found for user: {username}")
+                    await ctx.send(f"No messages found for user: {ctx.author.name}")
         else:
             await ctx.send("No user to mimic. Use the !mimic_random or !mimic_ai command first.")
 
     async def mimic_ai(self, ctx):
-        if ctx.channel.id in self.mimic_data:
-            username, messages = self.mimic_data[ctx.channel.id]
-            key = self.data_handler._sanitize_key(username)
-            self.data_handler.save_messages_to_csv(key, messages)
+        self.use_ai = True  # Set the flag to True when mimicking with AI
+        key = f'{ctx.author.name}_{ctx.guild.name}'
+        if key not in self.mimic_data:
+            user_messages = self.data_handler.load_messages_from_csv(key)
+            self.mimic_data[key] = user_messages
+        await ctx.send(f"Now mimicking with AI: {ctx.author.name}")
 
-            # Create a new thread that runs the preprocess_and_train method
-            training_thread = threading.Thread(target=self.ai_handler.preprocess_and_train, args=(key,))
-            training_thread.start()
+        # Create a new thread that runs the preprocess_and_train method
+        training_thread = threading.Thread(target=self.ai_handler.preprocess_and_train, args=(key,))
+        training_thread.start()
 
-            await ctx.send(f"Training AI model for user: {username}")
-        else:
-            await ctx.send("No user to mimic. Use the !mimic_random or !mimic_ai command first.")
+        await ctx.send(f"Training AI model for user: {ctx.author.name}")
 
     async def guess_who(self, ctx):
         self.use_ai = False
@@ -79,5 +80,3 @@ class MimicHandler:
 
         await ctx.send(f"Guess who said: {random_line}")
         await ctx.send(f"||{user_name}!||")
-
-

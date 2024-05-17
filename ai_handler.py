@@ -3,6 +3,7 @@ import logging
 from transformers import GPT2LMHeadModel, GPT2Tokenizer, TextDataset, DataCollatorForLanguageModeling
 from transformers import Trainer, TrainingArguments
 from data_handler import DataHandler
+import re
 
 
 class AIHandler:
@@ -16,6 +17,10 @@ class AIHandler:
         if self.tokenizer.pad_token_id is None:
             self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
         self.data_handler = DataHandler(base_path)
+
+    def extract_links_from_training_data(self, training_data):
+        url_pattern = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
+        self.known_links = url_pattern.findall(training_data)
 
     def generate_response(self, input_text):
         try:
@@ -40,6 +45,7 @@ class AIHandler:
     def preprocess_and_train(self, key, num_epochs=3, batch_size=2):
         safe_key = self.data_handler._sanitize_key(key)
         model_path = f"./gpt2-finetuned/{safe_key}"
+        links_file = os.path.join(self.base_path, f'{safe_key}_links.txt')
         if os.path.exists(model_path):
             self.model = GPT2LMHeadModel.from_pretrained(model_path)
             self.logger.info("Loaded existing model.")
