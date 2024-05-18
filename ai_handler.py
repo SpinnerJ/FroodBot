@@ -51,7 +51,6 @@ class AIHandler:
             self.logger.info("Loaded existing model.")
         else:
             try:
-                # Call the new preprocess_data method
                 self.data_handler.preprocess_data(key)
                 input_file = os.path.join(self.data_handler.base_path, f'{safe_key}_preprocessed.txt')
                 if not os.path.exists(input_file):

@@ -10,55 +10,61 @@ class MimicHandler:
     def __init__(self, data_handler, base_path):
         self.data_handler = data_handler
         self.mimic_data = {}
-        self.use_ai = False  # Add a flag to keep track of the mimic mode
-        self.ai_handler = AIHandler(base_path)  # Initialize AIHandler here
+        self.use_ai = False
+        self.ai_handler = AIHandler(base_path)
+        self.current_mimic = None
 
     async def mimic_random(self, ctx):
-        self.use_ai = False  # Set the flag to False when mimicking randomly
+        self.use_ai = False
         key = f'{ctx.author.name}_{ctx.guild.name}'
+        self.current_mimic = key
         if key not in self.mimic_data:
             user_messages = self.data_handler.load_messages_from_csv(key)
             self.mimic_data[key] = user_messages
         await ctx.send(f"Now mimicking: {ctx.author.name}")
 
     async def clear(self, ctx):
-        if ctx.channel.id in self.mimic_data:
-            del self.mimic_data[ctx.channel.id]
+        key = f'{ctx.author.name}_{ctx.guild.name}'
+        if key in self.mimic_data:
+            del self.mimic_data[key]
+            if self.current_mimic == key:
+                self.current_mimic = None
             await ctx.send("Cleared the current mimicked user.")
         else:
             await ctx.send("No user to clear. Use the !mimic_random or !mimic_ai command first.")
 
     async def r(self, ctx, *args):
-        key = f'{ctx.author.name}_{ctx.guild.name}'
+        key = self.current_mimic
         if key in self.mimic_data:
             user_messages = self.mimic_data[key]
-            if self.use_ai:  # Use the flag to decide which method to use
-                # Generate a response using AIHandler
+            if self.use_ai:
                 input_text = ' '.join(args)
                 generated_text = self.ai_handler.generate_response(input_text)
-                await ctx.send(f"{ctx.author.name} AI says: {generated_text}")
+                await ctx.send(f"{key.split('_')[0]} says: {generated_text}")
             else:
-                # Generate a response by randomly selecting a message
                 if user_messages:
-                    await ctx.send(f"{ctx.author.name} says: {random.choice(user_messages)}")
+                    await ctx.send(f"{key.split('_')[0]} says: {random.choice(user_messages)}")
                 else:
-                    await ctx.send(f"No messages found for user: {ctx.author.name}")
+                    await ctx.send(f"No messages found for user: {key.split('_')[0]}")
         else:
             await ctx.send("No user to mimic. Use the !mimic_random or !mimic_ai command first.")
 
     async def mimic_ai(self, ctx):
-        self.use_ai = True  # Set the flag to True when mimicking with AI
+        self.use_ai = True
         key = f'{ctx.author.name}_{ctx.guild.name}'
+        self.current_mimic = key
         if key not in self.mimic_data:
             user_messages = self.data_handler.load_messages_from_csv(key)
             self.mimic_data[key] = user_messages
         await ctx.send(f"Now mimicking with AI: {ctx.author.name}")
 
-        # Create a new thread that runs the preprocess_and_train method
-        training_thread = threading.Thread(target=self.ai_handler.preprocess_and_train, args=(key,))
-        training_thread.start()
-
-        await ctx.send(f"Training AI model for user: {ctx.author.name}")
+        model_path = os.path.join(self.ai_handler.base_path, key)
+        if os.path.exists(model_path):
+            await ctx.send(f"Found a trained model for user: {ctx.author.name}")
+        else:
+            training_thread = threading.Thread(target=self.ai_handler.preprocess_and_train, args=(key,))
+            training_thread.start()
+            await ctx.send(f"Training AI model for user: {ctx.author.name}")
 
     async def guess_who(self, ctx):
         self.use_ai = False
@@ -75,7 +81,7 @@ class MimicHandler:
         # Choose a random line from the filtered lines
         random_line = random.choice(user_messages) if user_messages else None
 
-        # Extract the user name from the file name
+        # Extract the username from the file name
         user_name = os.path.splitext(random_file)[0]  # remove the extension to get the username
 
         await ctx.send(f"Guess who said: {random_line}")
